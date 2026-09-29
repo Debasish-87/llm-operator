@@ -1,0 +1,16 @@
+apiVersion: serving.debasish.dev/v1alpha1
+kind: LLMService
+metadata:
+  name: llmservice-sample
+spec:
+  model: Qwen/Qwen2.5-1.5B-Instruct
+  gpus: 1
+  maxNumSeqs: 64
+  maxModelLen: 4096
+  tensorParallelSize: 1
+  cacheSize: 20Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetWaitingRequests: 5

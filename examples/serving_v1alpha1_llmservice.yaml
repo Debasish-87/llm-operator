@@ -1,0 +1,6 @@
+apiVersion: serving.debasish.dev/v1alpha1
+kind: LLMService
+metadata:
+  name: qwen-demo
+spec:
+  model: Qwen/Qwen2.5-1.5B-Instruct

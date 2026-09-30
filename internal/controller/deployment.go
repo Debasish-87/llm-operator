@@ -15,6 +15,23 @@ import (
 func deploymentForLLMService(
 	llmService *servingv1alpha1.LLMService,
 ) *appsv1.Deployment {
+	var env []corev1.EnvVar
+	if ref := llmService.Spec.HFTokenSecretRef; ref != nil {
+		key := ref.Key
+		if key == "" {
+			key = "token"
+		}
+		env = append(env, corev1.EnvVar{
+			Name: "HF_TOKEN",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: ref.Name},
+					Key:                  key,
+				},
+			},
+		})
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      llmService.Name,
@@ -55,15 +72,28 @@ func deploymentForLLMService(
 								},
 							},
 						},
+						{
+							// vLLM needs a large shared-memory segment (tensor parallel / NCCL).
+							Name: "shm",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
 							Name:  "vllm",
 							Image: llmService.Spec.Image,
+							Env:   env,
+							Ports: []corev1.ContainerPort{{Name: "http", ContainerPort: 8000, Protocol: corev1.ProtocolTCP}},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "model-cache",
 									MountPath: "/root/.cache/huggingface",
+								},
+								{
+									Name:      "shm",
+									MountPath: "/dev/shm",
 								},
 							},
 							Args: []string{
@@ -90,6 +120,17 @@ func deploymentForLLMService(
 								},
 							},
 
+							// Model download/load can take many minutes on first start.
+							StartupProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/health",
+										Port: intstr.FromInt(8000),
+									},
+								},
+								PeriodSeconds:    10,
+								FailureThreshold: 180,
+							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{

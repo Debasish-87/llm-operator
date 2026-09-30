@@ -474,10 +474,10 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(found).To(BeTrue())
 			Expect(triggers).To(HaveLen(1))
 
-			trigger := triggers[0].(map[string]interface{})
+			trigger := triggers[0].(map[string]any)
 			Expect(trigger["type"]).To(Equal("prometheus"))
 
-			triggerMetadata := trigger["metadata"].(map[string]interface{})
+			triggerMetadata := trigger["metadata"].(map[string]any)
 			Expect(triggerMetadata["threshold"]).To(Equal("5"))
 			Expect(triggerMetadata["query"]).To(Equal(
 				`sum(vllm:num_requests_waiting{model_name="Qwen/Qwen2.5-1.5B-Instruct"})`,
@@ -541,8 +541,8 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(found).To(BeTrue())
 			Expect(updatedTriggers).To(HaveLen(1))
 
-			updatedTrigger := updatedTriggers[0].(map[string]interface{})
-			updatedMetadata := updatedTrigger["metadata"].(map[string]interface{})
+			updatedTrigger := updatedTriggers[0].(map[string]any)
+			updatedMetadata := updatedTrigger["metadata"].(map[string]any)
 
 			Expect(updatedMetadata["threshold"]).To(Equal("10"))
 

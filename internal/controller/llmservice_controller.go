@@ -128,8 +128,8 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	if result, err := r.reconcileScaledObject(ctx, &llmService); err != nil {
-		return result, err
+	if err := r.reconcileScaledObject(ctx, &llmService); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	currentDeployment := &appsv1.Deployment{}
@@ -161,7 +161,7 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *LLMServiceReconciler) reconcileScaledObject(
 	ctx context.Context,
 	llmService *servingv1alpha1.LLMService,
-) (ctrl.Result, error) {
+) error {
 	existing := &unstructured.Unstructured{}
 	existing.SetGroupVersionKind(schema.GroupVersionKind{
 		Group: "keda.sh", Version: "v1alpha1", Kind: "ScaledObject",
@@ -175,35 +175,35 @@ func (r *LLMServiceReconciler) reconcileScaledObject(
 		switch {
 		case err == nil:
 			if derr := r.Delete(ctx, existing); derr != nil && !apierrors.IsNotFound(derr) {
-				return ctrl.Result{}, derr
+				return derr
 			}
 		case apierrors.IsNotFound(err), meta.IsNoMatchError(err):
 			// nothing to clean up (or KEDA is not installed)
 		default:
-			return ctrl.Result{}, err
+			return err
 		}
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	desired := scaledObjectForLLMService(llmService)
 	if err := ctrl.SetControllerReference(llmService, desired, r.Scheme); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, r.Create(ctx, desired)
+			return r.Create(ctx, desired)
 		}
-		return ctrl.Result{}, err // includes "KEDA CRD not installed"
+		return err // includes "KEDA CRD not installed"
 	}
 
 	desiredSpec, _, err := unstructured.NestedMap(desired.Object, "spec")
 	if err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 	existingSpec, _, err := unstructured.NestedMap(existing.Object, "spec")
 	if err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 	// KEDA defaults extra fields; only compare/apply the fields we own.
 	changed := false
@@ -215,9 +215,9 @@ func (r *LLMServiceReconciler) reconcileScaledObject(
 	}
 	if changed {
 		existing.Object["spec"] = existingSpec
-		return ctrl.Result{}, r.Update(ctx, existing)
+		return r.Update(ctx, existing)
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
